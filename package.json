@@ -1,0 +1,21 @@
+{
+  "name": "brancher",
+  "version": "1.0.0",
+  "description": "CLI to create backport PRs for multiple version branches from a single source PR",
+  "main": "dist/index.js",
+  "bin": {
+    "brancher": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc && chmod +x dist/index.js",
+    "prepare": "npm run build",
+    "dev": "tsc --watch"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
