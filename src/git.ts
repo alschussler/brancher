@@ -61,3 +61,30 @@ export function remoteBranchExists(branch: string, executor: Executor): boolean 
     return false;
   }
 }
+
+export function getCurrentBranch(executor: Executor): string {
+  return executor.query('git', ['rev-parse', '--abbrev-ref', 'HEAD']);
+}
+
+export function validateCommitExists(hash: string, executor: Executor): void {
+  try {
+    const type = executor.query('git', ['cat-file', '-t', hash]);
+    if (type !== 'commit') {
+      throw new Error(`"${hash}" is a ${type}, not a commit`);
+    }
+  } catch (err: any) {
+    if (err.message.includes('is a')) throw err;
+    throw new Error(`Commit "${hash}" not found in this repository`);
+  }
+}
+
+export function listBranches(executor: Executor): string[] {
+  const out = executor.query('git', ['branch', '-a', '--format=%(refname:short)']);
+  const seen = new Set<string>();
+  for (const b of out.split('\n').filter(Boolean)) {
+    seen.add(b.replace(/^origin\//, '').replace(/^HEAD$/, '').trim());
+  }
+  seen.delete('');
+  seen.delete('HEAD');
+  return [...seen].sort();
+}

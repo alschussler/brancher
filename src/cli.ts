@@ -1,92 +1,127 @@
+import { parseArgs } from 'node:util';
 import { CliOptions } from './types';
 
-export function parseArgs(argv: string[]): CliOptions {
+type CliArgDescription = {
+  type: 'string' | 'boolean';
+  short?: string;
+  multiple?: boolean;
+  default?: string | boolean | string[] | boolean[];
+  description: string;
+};
+
+type CliArgs = Record<string, CliArgDescription>;
+
+const ARGS_OPTIONS = {
+  pr: {
+    type: 'string' as const,
+    description: 'Source PR number to backport (required unless --cherry-pick)',
+  },
+  'cherry-pick': {
+    type: 'string' as const,
+    description: 'Commit hash to cherry-pick onto each target branch',
+  },
+  branches: {
+    type: 'string' as const,
+    short: 'b',
+    multiple: true,
+    description: 'Target branches (repeat for each). In --pr mode: base for new backport PRs. In --cherry-pick mode: branches that will receive the cherry-pick.',
+  },
+  push: {
+    type: 'boolean' as const,
+    default: false,
+    description: 'Push each branch to origin after cherry-picking (--cherry-pick mode)',
+  },
+  'dry-run': {
+    type: 'boolean' as const,
+    default: false,
+    description: 'Print commands that would run without executing them',
+  },
+  pick: {
+    type: 'boolean' as const,
+    default: false,
+    description: 'Interactively select which commits to cherry-pick (--pr mode)',
+  },
+  help: {
+    type: 'boolean' as const,
+    short: 'h',
+    default: false,
+    description: 'Show this help message',
+  },
+} satisfies CliArgs;
+
+export function parseCliArgs(argv: string[]): CliOptions {
   const args = argv.slice(2);
 
-  if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
+  if (args.length === 0) {
     printUsage();
     process.exit(0);
   }
 
+  const { values } = parseArgs({
+    args,
+    options: ARGS_OPTIONS,
+    strict: true,
+  });
+
+  if (values.help) {
+    printUsage();
+    process.exit(0);
+  }
+
+  const hasPr          = !!values.pr;
+  const hasCherryPick  = !!values['cherry-pick'];
+
+  if (!hasPr && !hasCherryPick) {
+    throw new Error('Either --pr or --cherry-pick is required');
+  }
+  if (hasPr && hasCherryPick) {
+    throw new Error('--pr and --cherry-pick are mutually exclusive');
+  }
+
   let pr: number | undefined;
-  const branches: string[] = [];
-  let dryRun = false;
-  let pick = false;
-
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-
-    if (arg === '--pr') {
-      const raw = args[++i];
-      if (raw === undefined || raw.startsWith('-')) {
-        throw new Error('--pr requires a number argument');
-      }
-      pr = parseInt(raw, 10);
-      if (isNaN(pr) || pr <= 0) {
-        throw new Error(`--pr requires a positive integer, got: ${raw}`);
-      }
-    } else if (arg === '--branches' || arg === '-b') {
-      let count = 0;
-      while (args[i + 1] !== undefined && !args[i + 1].startsWith('-')) {
-        branches.push(args[++i]);
-        count++;
-      }
-      if (count === 0) {
-        throw new Error(`${arg} requires at least one branch argument`);
-      }
-    } else if (arg === '--dry-run') {
-      dryRun = true;
-    } else if (arg === '--pick') {
-      pick = true;
-    } else {
-      throw new Error(
-        `Unknown argument: ${arg}\nRun with --help for usage information.`,
-      );
+  if (hasPr) {
+    pr = parseInt(values.pr!, 10);
+    if (isNaN(pr) || pr <= 0) {
+      throw new Error(`--pr requires a positive integer, got: ${values.pr}`);
     }
   }
 
-  if (pr === undefined) {
-    throw new Error('--pr is required');
-  }
+  const branches = values.branches ?? [];
   if (branches.length === 0) {
     throw new Error('--branches (-b) is required with at least one branch');
   }
 
-  return { pr, branches, dryRun, pick };
+  return {
+    pr,
+    cherryPickHash: values['cherry-pick'],
+    branches,
+    dryRun: values['dry-run'] ?? false,
+    pick:   values.pick ?? false,
+    push:   values.push ?? false,
+  };
 }
 
 export function printUsage(): void {
-  console.log(`
-brancher — Create backport PRs for multiple version branches
-
-USAGE
-  brancher --pr <number> --branches <branch...> [options]
-
-OPTIONS
-  --pr <number>             Source PR number to cherry-pick from (required)
-  --branches, -b <branch…>  Target branches to create PRs against (required)
-  --dry-run                 Print commands that would run without executing them
-  --pick                    Interactively select which commits to cherry-pick
-  --help, -h                Show this help message
-
-EXAMPLES
-  # Backport PR #123 to two version branches
-  brancher --pr 123 --branches 5.04.194.42 5.03.100.10
-
-  # Preview without making any changes
-  brancher --pr 123 -b release/5.04 release/5.03 --dry-run
-
-  # Interactively pick which commits to apply
-  brancher --pr 123 -b 5.04.x --pick
-
-BRANCH NAMING
-  New branches are formed by appending the sanitized target-branch version to
-  the source PR's head branch (digits only, all other characters stripped).
-  Example: source branch "fix-auth" + target "5.04.194.42" → "fix-auth-50419442"
-
-REQUIREMENTS
-  - git CLI available in PATH
-  - gh CLI (https://cli.github.com) available in PATH and authenticated
-  - Must be run from within the target git repository
-`);
+  console.log('');
+  console.log('brancher — Create backport PRs or cherry-pick commits across branches');
+  console.log('');
+  console.log('Usage:');
+  console.log('  brancher --pr <number> -b <branch> [-b <branch> ...] [options]');
+  console.log('  brancher --cherry-pick <hash> -b <branch> [-b <branch> ...] [--push]');
+  console.log('  brancher completion [bash|zsh|fish]');
+  console.log('');
+  console.log('Options:');
+  for (const [key, value] of Object.entries(ARGS_OPTIONS) as [string, CliArgDescription][]) {
+    const flag = `${value.short ? `-${value.short}, ` : '    '}--${key}`;
+    console.log(`  ${flag.padEnd(20)}  ${value.description}`);
+  }
+  console.log('');
+  console.log('Examples:');
+  console.log('  brancher --pr 123 -b 5.04.194.42 -b 5.03.100.10');
+  console.log('  brancher --pr 123 -b release/5.04 -b release/5.03 --dry-run');
+  console.log('  brancher --pr 123 -b 5.04.x --pick');
+  console.log('  brancher --cherry-pick abc1234 -b release/5.04 -b release/5.03');
+  console.log('  brancher --cherry-pick abc1234 -b release/5.04 --push');
+  console.log('  brancher completion bash >> ~/.bashrc');
+  console.log('');
 }

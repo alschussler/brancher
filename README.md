@@ -19,7 +19,7 @@ npm install -g https://github.com/alschussler/brancher.git
 ## Usage
 
 ```
-brancher --pr <number> --branches <branch...> [options]
+brancher --pr <number> -b <branch> [-b <branch> ...] [options]
 ```
 
 ### Options
@@ -27,7 +27,7 @@ brancher --pr <number> --branches <branch...> [options]
 | Flag | Description |
 |---|---|
 | `--pr <number>` | Source PR number to cherry-pick from (required) |
-| `--branches`, `-b <branch...>` | Target branches to create PRs against (required) |
+| `-b`, `--branches <branch>` | Target branch to create a PR against — repeat for each branch (required) |
 | `--dry-run` | Print the commands that would run without executing them |
 | `--pick` | Interactively select which commits to cherry-pick |
 | `--help`, `-h` | Show help |
@@ -36,10 +36,10 @@ brancher --pr <number> --branches <branch...> [options]
 
 ```bash
 # Backport PR #123 to two version branches
-brancher --pr 123 --branches 5.04.194.42 5.03.100.10
+brancher --pr 123 -b 5.04.194.42 -b 5.03.100.10
 
 # Preview what would happen without making any changes
-brancher --pr 123 -b release/5.04 release/5.03 --dry-run
+brancher --pr 123 -b release/5.04 -b release/5.03 --dry-run
 
 # Choose specific commits to backport
 brancher --pr 123 -b 5.04.x --pick

@@ -1,8 +1,10 @@
 export interface CliOptions {
-  pr: number;
+  pr?: number;
+  cherryPickHash?: string;
   branches: string[];
   dryRun: boolean;
   pick: boolean;
+  push: boolean;
 }
 
 export interface Commit {

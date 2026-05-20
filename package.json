@@ -12,7 +12,7 @@
     "dev": "tsc --watch"
   },
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=18.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
