@@ -13,7 +13,7 @@ When a fix needs to be applied to previous releases, brancher automates the proc
 ## Install
 
 ```bash
-npm install -g https://github.com/alschussler/brancher.git
+npm install -g https://github.com/alschussler/brancher.git --install-links
 ```
 
 ## Usage
