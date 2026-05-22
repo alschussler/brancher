@@ -1,9 +1,11 @@
-import { spawnSync } from 'child_process';
+import { spawnSync } from "child_process";
 
 export class Executor {
   private readonly useColors: boolean;
+  private readonly dryRun: boolean;
 
-  constructor(private readonly dryRun: boolean) {
+  constructor(dryRun: boolean) {
+    this.dryRun = dryRun;
     this.useColors = process.stdout.isTTY === true;
   }
 
@@ -13,10 +15,10 @@ export class Executor {
    */
   run(cmd: string, args: string[]): string {
     if (this.dryRun) {
-      const dim   = this.useColors ? '\x1B[2m' : '';
-      const reset = this.useColors ? '\x1B[0m' : '';
+      const dim = this.useColors ? "\x1B[2m" : "";
+      const reset = this.useColors ? "\x1B[0m" : "";
       process.stdout.write(`  ${dim}$ ${this.format(cmd, args)}${reset}\n`);
-      return '';
+      return "";
     }
     return this.exec(cmd, args);
   }
@@ -31,8 +33,8 @@ export class Executor {
 
   private exec(cmd: string, args: string[]): string {
     const result = spawnSync(cmd, args, {
-      encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
     });
 
     if (result.error) {
@@ -40,23 +42,23 @@ export class Executor {
     }
 
     if (result.status !== 0) {
-      const stderr = (result.stderr as string | null)?.trim() ?? '';
+      const stderr = (result.stderr as string | null)?.trim() ?? "";
       throw new Error(
         `Command failed (exit ${result.status}): ${this.format(cmd, args)}` +
-        (stderr ? `\n${stderr}` : ''),
+          (stderr ? `\n${stderr}` : ""),
       );
     }
 
-    return ((result.stdout as string | null) ?? '').trim();
+    return ((result.stdout as string | null) ?? "").trim();
   }
 
   /** Formats a command + args array as a human-readable shell string. */
   private format(cmd: string, args: string[]): string {
-    return [cmd, ...args.map(a => this.quote(a))].join(' ');
+    return [cmd, ...args.map((a) => this.quote(a))].join(" ");
   }
 
   private quote(arg: string): string {
-    if (arg === '' || /[\s'"\\$|&;<>(){}[\]#~`!]/.test(arg)) {
+    if (arg === "" || /[\s'"\\$|&;<>(){}[\]#~`!]/.test(arg)) {
       return `'${arg.replace(/'/g, "'\\''")}'`;
     }
     return arg;

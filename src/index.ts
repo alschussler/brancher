@@ -1,27 +1,27 @@
 #!/usr/bin/env node
 
-import { spawnSync } from 'child_process';
-import { parseCliArgs, printUsage } from './cli';
-import { printCompletionScript } from './completions';
-import { Executor } from './executor';
-import { fetchPrInfo, createPr } from './github';
-import * as git from './git';
-import { pickCommits } from './picker';
-import { buildNewBranchName } from './utils';
-import { log } from './logger';
-import { BranchResult, Commit, PrInfo } from './types';
+import { spawnSync } from "child_process";
+import { parseCliArgs, printUsage } from "./cli.ts";
+import { printCompletionScript } from "./completions.ts";
+import { Executor } from "./executor.ts";
+import { fetchPrInfo, createPr } from "./github.ts";
+import * as git from "./git.ts";
+import { pickCommits } from "./picker.ts";
+import { buildNewBranchName } from "./utils.ts";
+import { log } from "./logger.ts";
+import type { BranchResult, Commit, PrInfo } from "./types.ts";
 
 // ─── Prerequisites ────────────────────────────────────────────────────────────
 
 function checkPrerequisites(needsGh: boolean): void {
-  const tools = needsGh ? ['git', 'gh'] : ['git'];
+  const tools = needsGh ? ["git", "gh"] : ["git"];
   for (const tool of tools) {
-    const result = spawnSync(tool, ['--version'], { encoding: 'utf-8' });
+    const result = spawnSync(tool, ["--version"], { encoding: "utf-8" });
     if (result.error || result.status !== 0) {
       log.error(
-        tool === 'gh'
-          ? 'gh CLI is not installed or not in PATH.\n  Install it from https://cli.github.com'
-          : 'git is not installed or not in PATH.',
+        tool === "gh"
+          ? "gh CLI is not installed or not in PATH.\n  Install it from https://cli.github.com"
+          : "git is not installed or not in PATH.",
       );
       process.exit(1);
     }
@@ -34,18 +34,18 @@ async function main(): Promise<void> {
   const rawArgs = process.argv.slice(2);
 
   // Handle 'completion' subcommand before full arg parsing
-  if (rawArgs[0] === 'completion') {
-    printCompletionScript(rawArgs[1] ?? 'bash');
+  if (rawArgs[0] === "completion") {
+    printCompletionScript(rawArgs[1] ?? "bash");
     process.exit(0);
   }
 
   // Hidden flag used by shell completion scripts to enumerate branches
-  if (rawArgs.includes('--list-branches')) {
+  if (rawArgs.includes("--list-branches")) {
     const executor = new Executor(false);
     try {
       git.validateRepo(executor);
       const branches = git.listBranches(executor);
-      console.log(branches.join('\n'));
+      console.log(branches.join("\n"));
     } catch {
       // silent — completion scripts must not produce error output
     }
@@ -58,7 +58,7 @@ async function main(): Promise<void> {
     options = parseCliArgs(process.argv);
   } catch (err: any) {
     log.error(`Error: ${err.message}`);
-    console.error('Run with --help for usage information.');
+    console.error("Run with --help for usage information.");
     process.exit(1);
   }
 
@@ -67,7 +67,7 @@ async function main(): Promise<void> {
   checkPrerequisites(/* needsGh */ !cherryPickHash);
 
   if (dryRun) {
-    log.warn('Dry-run mode — no commands will be executed\n');
+    log.warn("Dry-run mode — no commands will be executed\n");
   }
 
   // Validate we are inside a git repository and the tree is clean
@@ -85,7 +85,13 @@ async function main(): Promise<void> {
 
   // ── Cherry-pick mode ───────────────────────────────────────────────────────
   if (cherryPickHash) {
-    await runCherryPickMode({ hash: cherryPickHash, branches, push, dryRun, executor });
+    await runCherryPickMode({
+      hash: cherryPickHash,
+      branches,
+      push,
+      dryRun,
+      executor,
+    });
     return;
   }
 
@@ -114,13 +120,13 @@ async function runCherryPickMode(opts: {
     }
   }
 
-  log.info('');
+  log.info("");
   log.info(`Cherry-picking ${hash} onto ${branches.length} branch(es):`);
   for (const b of branches) log.dim(`  ${b}`);
-  if (push) log.dim('  (will push each branch after cherry-pick)');
+  if (push) log.dim("  (will push each branch after cherry-pick)");
 
   // Remember the starting branch so we can return to it
-  let originalBranch = '';
+  let originalBranch = "";
   if (!dryRun) {
     try {
       originalBranch = git.getCurrentBranch(executor);
@@ -155,16 +161,22 @@ async function runCherryPickMode(opts: {
       log.success(`  ✓  done`);
     } catch (err: any) {
       log.error(`  Failed: ${err.message}`);
-      results.push({ targetBranch: branch, newBranch: branch, error: err.message });
+      results.push({
+        targetBranch: branch,
+        newBranch: branch,
+        error: err.message,
+      });
     }
   }
 
   // Restore original branch
-  if (!dryRun && originalBranch && originalBranch !== 'HEAD') {
+  if (!dryRun && originalBranch && originalBranch !== "HEAD") {
     try {
       git.checkoutBranch(originalBranch, executor);
     } catch {
-      log.warn(`  Could not restore original branch "${originalBranch}" — check your working tree.`);
+      log.warn(
+        `  Could not restore original branch "${originalBranch}" — check your working tree.`,
+      );
     }
   }
 
@@ -192,7 +204,7 @@ async function runPrBackportMode(opts: {
     process.exit(1);
   }
 
-  log.info('');
+  log.info("");
   log.info(`PR #${prInfo!.number}: ${prInfo!.title}`);
   log.dim(`  Source branch : ${prInfo!.headBranch}`);
   log.dim(`  Base branch   : ${prInfo!.baseBranch}`);
@@ -201,7 +213,7 @@ async function runPrBackportMode(opts: {
   // ── Select commits ─────────────────────────────────────────────────────────
   let selectedCommits: Commit[];
   if (pick) {
-    log.info('');
+    log.info("");
     try {
       selectedCommits = await pickCommits(prInfo!.commits);
     } catch (err: any) {
@@ -209,14 +221,14 @@ async function runPrBackportMode(opts: {
       process.exit(1);
     }
     if (selectedCommits!.length === 0) {
-      log.warn('\nNo commits selected. Nothing to do.');
+      log.warn("\nNo commits selected. Nothing to do.");
       process.exit(0);
     }
   } else {
     selectedCommits = prInfo!.commits;
   }
 
-  log.info('');
+  log.info("");
   log.info(`Commits to cherry-pick (${selectedCommits!.length}):`);
   for (const commit of selectedCommits!) {
     log.dim(`  ${commit.shortSha}  ${commit.message}`);
@@ -236,7 +248,7 @@ async function runPrBackportMode(opts: {
     }
   }
 
-  log.info('');
+  log.info("");
   log.info(`Target branches (${plans.length}):`);
   for (const p of plans) {
     log.dim(`  ${p.targetBranch}  →  ${p.newBranch}`);
@@ -251,7 +263,11 @@ async function runPrBackportMode(opts: {
     try {
       if (!dryRun && git.remoteBranchExists(newBranch, executor)) {
         log.warn(`  Branch "${newBranch}" already exists on origin. Skipping.`);
-        results.push({ targetBranch, newBranch, error: 'Branch already exists on origin' });
+        results.push({
+          targetBranch,
+          newBranch,
+          error: "Branch already exists on origin",
+        });
         continue;
       }
 
@@ -266,7 +282,7 @@ async function runPrBackportMode(opts: {
       git.createBranch(newBranch, executor);
 
       log.step(
-        `Cherry-picking ${selectedCommits!.length} commit${selectedCommits!.length === 1 ? '' : 's'}`,
+        `Cherry-picking ${selectedCommits!.length} commit${selectedCommits!.length === 1 ? "" : "s"}`,
       );
       for (const commit of selectedCommits!) {
         log.dim(`    ${commit.shortSha}  ${commit.message}`);
@@ -277,7 +293,13 @@ async function runPrBackportMode(opts: {
       git.pushBranch(newBranch, executor);
 
       log.step(`Creating PR: ${prInfo!.title}`);
-      const prUrl = createPr(prInfo!.title, prInfo!.body, newBranch, targetBranch, executor);
+      const prUrl = createPr(
+        prInfo!.title,
+        prInfo!.body,
+        newBranch,
+        targetBranch,
+        executor,
+      );
 
       results.push({ targetBranch, newBranch, prUrl: prUrl || undefined });
       if (!dryRun && prUrl) {
@@ -295,12 +317,12 @@ async function runPrBackportMode(opts: {
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
 function printSummary(results: BranchResult[]): void {
-  log.section('Summary');
-  const succeeded = results.filter(r => !r.error);
-  const failed    = results.filter(r => r.error);
+  log.section("Summary");
+  const succeeded = results.filter((r) => !r.error);
+  const failed = results.filter((r) => r.error);
 
   for (const r of succeeded) {
-    const url = r.prUrl ? `  ${r.prUrl}` : '';
+    const url = r.prUrl ? `  ${r.prUrl}` : "";
     log.success(`  ✓  ${r.targetBranch}${url}`);
   }
   for (const r of failed) {
@@ -308,16 +330,16 @@ function printSummary(results: BranchResult[]): void {
   }
 
   if (failed.length > 0) {
-    log.info('');
+    log.info("");
     log.warn(
       `${failed.length} of ${results.length} branch(es) failed.` +
-      ' Review the errors above and retry those branches manually if needed.',
+        " Review the errors above and retry those branches manually if needed.",
     );
     process.exit(1);
   }
 }
 
-main().catch(err => {
+main().catch((err) => {
   log.error(`\nUnexpected error: ${err.message}`);
   if (process.env.DEBUG) {
     console.error(err.stack);

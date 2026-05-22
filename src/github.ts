@@ -1,5 +1,5 @@
-import { Executor } from './executor';
-import { Commit, PrInfo } from './types';
+import { Executor } from "./executor.ts";
+import type { Commit, PrInfo } from "./types.ts";
 
 interface GhCommit {
   oid: string;
@@ -19,15 +19,18 @@ interface GhPrView {
 export function fetchPrInfo(prNumber: number, executor: Executor): PrInfo {
   let raw: string;
   try {
-    raw = executor.query('gh', [
-      'pr', 'view', String(prNumber),
-      '--json', 'number,title,body,headRefName,baseRefName,commits',
+    raw = executor.query("gh", [
+      "pr",
+      "view",
+      String(prNumber),
+      "--json",
+      "number,title,body,headRefName,baseRefName,commits",
     ]);
   } catch (err: any) {
     throw new Error(
       `Failed to fetch PR #${prNumber} from GitHub.\n` +
-      `  Make sure gh is installed, authenticated, and this is the right repo.\n` +
-      `  Details: ${err.message}`,
+        `  Make sure gh is installed, authenticated, and this is the right repo.\n` +
+        `  Details: ${err.message}`,
     );
   }
 
@@ -41,12 +44,10 @@ export function fetchPrInfo(prNumber: number, executor: Executor): PrInfo {
   }
 
   if (!data.commits || data.commits.length === 0) {
-    throw new Error(
-      `PR #${prNumber} has no commits. Nothing to cherry-pick.`,
-    );
+    throw new Error(`PR #${prNumber} has no commits. Nothing to cherry-pick.`);
   }
 
-  const commits: Commit[] = data.commits.map(c => ({
+  const commits: Commit[] = data.commits.map((c) => ({
     sha: c.oid,
     shortSha: c.oid.slice(0, 7),
     message: c.messageHeadline,
@@ -55,7 +56,7 @@ export function fetchPrInfo(prNumber: number, executor: Executor): PrInfo {
   return {
     number: data.number,
     title: data.title,
-    body: data.body ?? '',
+    body: data.body ?? "",
     headBranch: data.headRefName,
     baseBranch: data.baseRefName,
     commits,
@@ -69,11 +70,16 @@ export function createPr(
   baseBranch: string,
   executor: Executor,
 ): string {
-  return executor.run('gh', [
-    'pr', 'create',
-    '--title', title,
-    '--body',  body,
-    '--head',  headBranch,
-    '--base',  baseBranch,
+  return executor.run("gh", [
+    "pr",
+    "create",
+    "--title",
+    title,
+    "--body",
+    body,
+    "--head",
+    headBranch,
+    "--base",
+    baseBranch,
   ]);
 }
